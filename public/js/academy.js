@@ -34,6 +34,8 @@ const academy = {
   },
 
   _renderTrilha() {
+    const el = document.getElementById('academy-content');
+    if (!el) return;
     const modulos = academy._modulos;
     const categorias = ['MANUAL APP', 'BASICO', 'INTERMEDIARIO', 'AVANCADO', 'ESPECIALISTA', 'MASTER'];
     const catNomes = { 'MANUAL APP': 'Manual do App', 'BASICO': 'Técnica de Vendas', 'INTERMEDIARIO': 'Negociação', 'AVANCADO': 'Performance', 'ESPECIALISTA': 'Liderança', 'MASTER': 'Gestão Master' };

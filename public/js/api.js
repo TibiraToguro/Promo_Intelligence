@@ -19,8 +19,8 @@ const api = {
   // GET → /app/query?evento=...&token=...
   async get(evento, params = {}) {
     const token = state.get('token');
-    const device_info = navigator.userAgent || 'unknown';
-    const query = { ...params, evento, token: token || '', device_info };
+    // Para GET, mantemos apenas o essencial para evitar URLs gigantes (Bad Request)
+    const query = { ...params, evento, token: token || '' };
     const qs = new URLSearchParams(query).toString();
     const res = await fetch(`${API_URL}/app/query?${qs}`);
     return _parseResponse(res);

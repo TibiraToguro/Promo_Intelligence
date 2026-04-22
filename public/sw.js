@@ -1,4 +1,4 @@
-const SW_VERSION = 'jet-one-v1.4.0-ONE';
+const SW_VERSION = 'jet-one-v1.5.2-FINAL';
 const BASE = ''; // Servido da raiz do public no Cloud Run
 
 const ASSETS = [
