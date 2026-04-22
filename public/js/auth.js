@@ -31,7 +31,12 @@ const auth = {
 
   _rotearPorPerfil(user) {
     const vinculo = (user.tipo_vinculo || '').toUpperCase();
-    if (vinculo === 'CLT' || vinculo === 'FISCAL') {
+    const cargo = (user.cargo_principal || '').toUpperCase();
+
+    if (vinculo === 'GESTOR' || vinculo === 'LIDER' || cargo === 'GESTOR' || cargo === 'LIDER') {
+      window.location.href = '/gestor/'; // Redireciona para o painel avançado
+      return;
+    } else if (vinculo === 'CLT' || vinculo === 'FISCAL') {
       router.replace('home-clt');
     } else {
       router.replace('home');
