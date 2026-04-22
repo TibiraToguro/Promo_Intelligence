@@ -109,6 +109,7 @@ const academy = {
   },
 
   _renderModulo(modulo) {
+    const md = (t) => (t || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     let html = `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
         <button onclick="academy._renderTrilha()" style="background:#1e2a45;border:none;color:#eaf0fb;font-size:20px;width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center">‹</button>
@@ -123,15 +124,16 @@ const academy = {
         html += `
           <div style="background:linear-gradient(135deg,#2c5282,#1a365d);border:1px solid #4299e144;border-radius:16px;padding:32px 20px;margin-bottom:16px;text-align:center;box-shadow:0 10px 20px rgba(0,0,0,0.2)">
             <div style="font-size:40px;margin-bottom:12px">🚀</div>
-            <div style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff">${block.title}</div>
-            <div style="font-size:13px;color:#bee3f8;line-height:1.5">${block.subtitle}</div>
+            <div style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff">${md(block.title)}</div>
+            <div style="font-size:13px;color:#bee3f8;line-height:1.5">${md(block.subtitle)}</div>
           </div>`;
       } else if (block.type === 'text_md') {
         const txt = block.value.split('\n').map(ln => {
-          if (ln.startsWith('## ')) return `<div style="font-size:16px;font-weight:800;color:#63b3ed;margin:20px 0 8px">${ln.slice(3)}</div>`;
-          if (ln.startsWith('### ')) return `<div style="font-size:14px;font-weight:700;color:#f6ad55;margin:14px 0 6px">${ln.slice(4)}</div>`;
-          if (ln.startsWith('> ')) return `<div style="background:#0a0f1e;border-left:4px solid #f6ad55;padding:12px;border-radius:4px;font-size:13px;font-style:italic;color:#f6ad55;margin:12px 0">${ln.slice(2)}</div>`;
-          return `<div style="font-size:14px;color:#eaf0fb;line-height:1.6;margin:6px 0">${ln}</div>`;
+          if (ln.startsWith('## ')) return `<div style="font-size:16px;font-weight:800;color:#63b3ed;margin:20px 0 8px">${md(ln.slice(3))}</div>`;
+          if (ln.startsWith('### ')) return `<div style="font-size:14px;font-weight:700;color:#f6ad55;margin:14px 0 6px">${md(ln.slice(4))}</div>`;
+          if (ln.startsWith('> ')) return `<div style="background:#0a0f1e;border-left:4px solid #f6ad55;padding:12px;border-radius:4px;font-size:13px;font-style:italic;color:#f6ad55;margin:12px 0">${md(ln.slice(2))}</div>`;
+          if (ln.startsWith('- ')) return `<div style="font-size:14px;color:#eaf0fb;line-height:1.6;margin:6px 0;padding-left:12px">● ${md(ln.slice(2))}</div>`;
+          return `<div style="font-size:14px;color:#eaf0fb;line-height:1.6;margin:6px 0">${md(ln)}</div>`;
         }).join('');
         html += `<div style="background:#1e2a45;border:1px solid #2a3a55;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.1)">${txt}</div>`;
       } else if (block.type === 'choice_simulation') {

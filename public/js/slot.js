@@ -97,16 +97,17 @@ const slotScreen = {
             </div>`;
         }
 
+        const isSugestao = s.is_sugestao || s.sugerido;
         slotsHtml += `
-          <div style="background:#1e2a45;border:1px solid #2a3a55;border-radius:16px;padding:16px;margin-bottom:12px;position:relative;${s.is_sugestao ? 'border-left:4px solid #f6ad55' : ''}">
-            ${s.is_sugestao ? '<div style="position:absolute;top:10px;right:16px;background:#f6ad55;color:#1a1a2e;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px">SUGESTÃO</div>' : ''}
-            <div style="font-size:13px;color:#63b3ed;font-weight:700;margin-bottom:4px">${s.operacao || 'PROMO'}</div>
-            <div style="font-size:16px;font-weight:700;margin-bottom:4px">${s.local_nome || s.local}</div>
-            <div style="font-size:13px;color:#a0aec0;margin-bottom:12px">⏰ ${s.inicio} - ${s.fim}</div>
+          <div style="background:#161616;border:1px solid ${isSugestao ? '#F5B700' : '#2C2C2C'};border-radius:18px;padding:20px;margin-bottom:12px;position:relative;box-shadow:0 4px 15px rgba(0,0,0,0.2)">
+            ${isSugestao ? '<div style="position:absolute;top:10px;right:20px;background:#F5B700;color:#000;font-size:9px;font-weight:900;padding:2px 8px;border-radius:20px">SUGESTÃO</div>' : ''}
+            <div style="font-size:12px;color:#00FF87;font-weight:800;font-family:var(--mono);margin-bottom:4px;letter-spacing:1px">${s.operacao || 'PROMO'}</div>
+            <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:4px">${s.local_nome || s.local}</div>
+            <div style="font-size:13px;color:#555;margin-bottom:15px;font-weight:600">⏰ ${s.inicio} - ${s.fim}</div>
             
-            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid rgba(255,255,255,0.05)">
-              <div style="font-size:11px;color:#718096">📍 ${s.cidade || ''}</div>
-              <button onclick="slotScreen._aceitar('${s.slot_id}', this)" data-inicio="${s.inicio}" style="background:#4f8ef7;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Aceitar Vaga</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:15px;border-top:1px solid #2C2C2C">
+              <div style="font-size:11px;color:#555;font-family:var(--mono)">📍 ${s.cidade || ''}</div>
+              <button onclick="slotScreen._aceitar('${s.slot_id}', this)" data-inicio="${s.inicio}" style="background:#00FF87;color:#000;border:none;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(0,255,135,0.2)">ACEITAR VAGA</button>
             </div>
           </div>`;
       });
