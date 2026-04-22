@@ -95,8 +95,8 @@ const auth = {
   _renderLogin(erro) {
     document.getElementById("app").innerHTML = `
       <div style="min-height:100dvh;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:16px;font-family:-apple-system,sans-serif">
-        <div style="font-size:32px;font-weight:800;color:#4f8ef7;letter-spacing:2px">JET·OPS</div>
-        <div style="font-size:13px;color:#a0aec0;text-align:center">Sistema Operacional de Promotores</div>
+        <div style="font-size:36px;font-weight:900;color:#00FF87;letter-spacing:-1px">JET <span style="color:#fff">One</span></div>
+        <div style="font-size:13px;color:#a0aec0;text-align:center">Inteligência Operacional</div>
         <div style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px">
           <div style="background:#1e2a45;border:1px solid #2a3a55;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px">
             <div style="font-size:11px;color:#a0aec0;letter-spacing:1px">CPF</div>
@@ -107,12 +107,12 @@ const auth = {
               style="background:#16213e;border:1.5px solid #2a3a55;border-radius:10px;color:#eaf0fb;font-size:15px;padding:13px;width:100%;outline:none;box-sizing:border-box"/>
           </div>
           <button id="btn-entrar" onclick="auth._loginCPF()"
-            style="background:#4f8ef7;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;padding:15px;width:100%;cursor:pointer">
+            style="background:#00FF87;color:#000;border:none;border-radius:10px;font-size:16px;font-weight:800;padding:15px;width:100%;cursor:pointer">
             Entrar →
           </button>
         </div>
         ${erro ? `<div style="color:#e74c3c;font-size:13px;text-align:center;padding:10px 16px;background:rgba(231,76,60,.15);border-radius:8px;border:1px solid rgba(231,76,60,.3);width:100%;max-width:340px;box-sizing:border-box">${erro}</div>` : ""}
-        <div style="font-size:10px;color:#4a5568;text-align:center;margin-top:10px;letter-spacing:1px">VERSÃO v1.3.14-GH</div>
+        <div style="font-size:10px;color:#4a5568;text-align:center;margin-top:10px;letter-spacing:1px">VERSÃO v1.4.0-ONE</div>
         <div style="font-size:12px;color:#6c7a8d;text-align:center;max-width:300px">
           Use o CPF e sua data de nascimento para entrar
         </div>

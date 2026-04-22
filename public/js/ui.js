@@ -56,9 +56,9 @@ const ui = {
 
   header(title, sub = '', showBack = true) {
     return `<div class="header">
-      ${showBack ? '<button onclick="router.back()" style="min-height:44px;padding:0 16px;border-radius:12px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;white-space:nowrap">← Voltar</button>' : ''}
+      ${showBack ? '<button onclick="router.back()" style="width:40px;height:40px;border-radius:10px;background:var(--surface3);border:1px solid var(--border2);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent">←</button>' : ''}
       <div style="flex:1"><div class="header-title">${title}</div>${sub ? `<div class="header-sub">${sub}</div>` : ''}</div>
-      <div id="hdr-score" style="font-size:11px;color:#f6ad55;font-weight:700;background:rgba(246,173,85,0.15);border:1px solid rgba(246,173,85,0.3);padding:3px 10px;border-radius:20px;display:none">⭐ —</div>
+      <div id="hdr-score" style="font-size:11px;color:var(--accent);font-weight:800;background:var(--accent-dim);padding:4px 10px;border-radius:20px;display:none;font-family:var(--mono)">⭐ —</div>
     </div>`;
   },
 
