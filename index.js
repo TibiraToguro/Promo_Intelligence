@@ -25,6 +25,29 @@ app.get('/gestor/*', (_req, res) => res.sendFile(path.join(__dirname, 'public-ge
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/version', (_req, res) => res.json({ ok: true, service: 'promo-telegram-gateway', version: '1.3.9-GH', now: new Date().toISOString() }));
+
+// ── Rotas de Compatibilidade PWA (Migração) ──────────────────────────────────
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { cpf, senha } = req.body;
+    const result = await callAppsScriptPost({ evento: 'LOGIN_CLT', cpf, senha });
+    if (!result.ok) return res.status(401).json(result);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, erro: err.message });
+  }
+});
+
+app.get('/auth/me', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+    const result = await callAppsScriptGet('GET_ME', { token });
+    if (!result.ok) return res.status(401).json(result);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, erro: err.message });
+  }
+});
 // ─────────────────────────────────────────────────────────────────────────────
 
 app.use(express.json({ limit: '1mb' }));
