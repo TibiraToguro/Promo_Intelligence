@@ -1534,9 +1534,10 @@ function requireAdminSecret(req, res, next) {
 
 function corsMiddleware(req, res, next) {
   const origin = req.get('origin') || '*';
-  if (!CFG.corsOrigin || CFG.corsOrigin === '*' || origin === CFG.corsOrigin) res.setHeader('Access-Control-Allow-Origin', CFG.corsOrigin || '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Secret');
+  if (!CFG.corsOrigin || CFG.corsOrigin === '*' || origin === CFG.corsOrigin) res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Secret, Authorization, X-Gestor-Token');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 }
