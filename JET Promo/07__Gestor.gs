@@ -242,7 +242,28 @@ function getSlotsHoje_(token, params) {
     if (maxProm > local.max_promotores) local.max_promotores = maxProm;
 
     if (userId && prom.nome) {
-      local.promotores.push({ user_id:userId, nome:prom.nome, status:statusRaw, slot_id:slotId });
+      // Buscar jornada detalhada para Live Status
+      let jornadaInfo = { status: statusRaw, inicio_real: null };
+      const jWs = ss.getSheetByName('JORNADAS');
+      if (jWs) {
+        const jData = jWs.getDataRange().getValues(), jh = jData[0].map(v => String(v).toLowerCase().trim());
+        const iSlt = jh.indexOf('slot_id'), iUsr = jh.indexOf('user_id'), iIniR = jh.indexOf('inicio_real'), iStt = jh.indexOf('status');
+        for (let jr = 1; r < jData.length; r++) {
+          if (String(jData[r][iSlt]).trim() === slotId && String(jData[r][iUsr]).trim() === userId) {
+            jornadaInfo.status = String(jData[r][iStt]).trim();
+            jornadaInfo.inicio_real = jData[r][iIniR] || null;
+            break;
+          }
+        }
+      }
+
+      local.promotores.push({ 
+        user_id:userId, 
+        nome:prom.nome, 
+        status: jornadaInfo.status, 
+        inicio_real: jornadaInfo.inicio_real,
+        slot_id:slotId 
+      });
       if (statusFront === 'OCUPADO') local.vagas_ocupadas++;
     }
 
@@ -322,32 +343,139 @@ function aprovarCadastro_(token, params) {
   }
 }
 
+function _validarConflitoSlot_(ss, nome, data, inicio, fim, ignorarId = null) {
+  const ws = ss.getSheetByName('SLOTS');
+  if (!ws) return null;
+  const rows = ws.getDataRange().getValues();
+  const h = rows[0].map(v => String(v).toLowerCase().trim());
+  const iNome = h.indexOf('local_nome'), iDt = h.indexOf('data'), iIni = h.indexOf('inicio'), iFim = h.indexOf('fim'), iSt = h.indexOf('status'), iId = h.indexOf('slot_id');
+
+  const hIni = parseInt(String(inicio).replace(':', ''));
+  const hFim = parseInt(String(fim).replace(':', ''));
+
+  for (let r = 1; r < rows.length; r++) {
+    const status = String(rows[r][iSt]).trim().toUpperCase();
+    if (status === 'CANCELADO') continue;
+    
+    const slotId = String(rows[r][iId]).trim();
+    if (ignorarId && slotId === ignorarId) continue;
+
+    const dSlot = String(rows[r][iDt] instanceof Date ? Utilities.formatDate(rows[r][iDt], "GMT-3", "yyyy-MM-dd") : rows[r][iDt]).substring(0, 10);
+    const nSlot = String(rows[r][iNome]).trim();
+
+    if (dSlot === data && nSlot === nome) {
+      const sIni = parseInt(String(rows[r][iIni]).substring(0, 5).replace(':', ''));
+      const sFim = parseInt(String(rows[r][iFim]).substring(0, 5).replace(':', ''));
+
+      // Verifica sobreposição de horário
+      if ((hIni >= sIni && hIni < sFim) || (hFim > sIni && hFim <= sFim) || (sIni >= hIni && sIni < hFim)) {
+        return { slot_id: slotId, nome: nSlot, inicio: rows[r][iIni], fim: rows[r][iFim] };
+      }
+    }
+  }
+  return null;
+}
+
 function criarSlot_(token, params) {
   const gestor=_assertGestor_(token);
-  const{nome,cidade,lat,lng,data,inicio,fim,raio_metros,cargo_previsto}=params;
+  const{slot_id, nome,cidade,lat,lng,data,inicio,fim,raio_metros,cargo_previsto,operacao, ignorar_conflito}=params;
   if(!nome||!cidade||!lat||!lng||!data||!inicio||!fim) throw new Error('Campos obrigatórios faltando.');
+
+  const ss=SpreadsheetApp.openById(getConfig_('spreadsheet_id_master'));
+  
+  if (!ignorar_conflito) {
+    const conflito = _validarConflitoSlot_(ss, nome, data, inicio, fim, slot_id);
+    if (conflito) return { ok: false, conflito: true, mensagem: `Já existe um slot em "${nome}" neste horário (${conflito.inicio}-${conflito.fim}). Deseja criar mesmo assim?` };
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    const sheet=ss.getSheetByName('SLOTS'); if(!sheet) throw new Error('Aba SLOTS não encontrada.');
+    const agora=new Date().toISOString();
+    const headers=sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
+    const h=headers.map(v=>String(v).toLowerCase().trim());
+    
+    let targetRow = -1;
+    let finalSlotId = slot_id || ('SLT_'+new Date().getTime());
+
+    if (slot_id) {
+      const dataS = sheet.getDataRange().getValues();
+      const iId = h.indexOf('slot_id');
+      for (let r = 1; r < dataS.length; r++) {
+        if (String(dataS[r][iId]).trim() === slot_id) {
+          targetRow = r + 1;
+          break;
+        }
+      }
+    }
+
+    if (targetRow > 0) {
+      // Editar
+      const sc = (col, val) => { const i = h.indexOf(col); if (i >= 0) sheet.getRange(targetRow, i + 1).setValue(val); };
+      sc('local_nome', nome);
+      sc('cidade', cidade);
+      sc('lat', parseFloat(lat));
+      sc('lng', parseFloat(lng));
+      sc('data', String(data).substring(0, 10));
+      sc('inicio', String(inicio).substring(0, 5));
+      sc('fim', String(fim).substring(0, 5));
+      sc('raio_metros', parseInt(raio_metros) || 100);
+      sc('cargo_previsto', cargo_previsto || 'PROMOTOR');
+      sc('operacao', operacao || 'PROMO');
+      sc('atualizado_em', agora);
+      
+      registrarAuditoria_({tabela:'SLOTS',registro_id:finalSlotId,campo:'edicao',valor_anterior:'',valor_novo:JSON.stringify(params),alterado_por:gestor.user_id||'',origem:'painel_gestor'});
+      return { ok: true, slot_id: finalSlotId, mensagem: 'Slot atualizado com sucesso.' };
+    } else {
+      // Criar novo
+      const row=new Array(headers.length).fill('');
+      row[h.indexOf('slot_id')]=finalSlotId; row[h.indexOf('cidade')]=cidade; row[h.indexOf('operacao')]=operacao||'PROMO';
+      row[h.indexOf('local_nome')]=nome; row[h.indexOf('lat')]=parseFloat(lat); row[h.indexOf('lng')]=parseFloat(lng);
+      row[h.indexOf('raio_metros')]=parseInt(raio_metros)||100; row[h.indexOf('status')]='DISPONIVEL';
+      row[h.indexOf('cargo_previsto')]=cargo_previsto||'PROMOTOR'; row[h.indexOf('criado_em')]=agora; row[h.indexOf('atualizado_em')]=agora;
+      sheet.appendRow(row);
+      const lastRow=sheet.getLastRow();
+      const iData=h.indexOf('data'), iInicio=h.indexOf('inicio'), iFim=h.indexOf('fim');
+      if(iData>-1)   sheet.getRange(lastRow,iData+1).setNumberFormat('@').setValue(String(data).substring(0,10));
+      if(iInicio>-1) sheet.getRange(lastRow,iInicio+1).setNumberFormat('@').setValue(String(inicio).substring(0,5));
+      if(iFim>-1)    sheet.getRange(lastRow,iFim+1).setNumberFormat('@').setValue(String(fim).substring(0,5));
+      registrarAuditoria_({tabela:'SLOTS',registro_id:finalSlotId,campo:'criacao',valor_anterior:'',valor_novo:JSON.stringify({nome,cidade,data,inicio,fim}),alterado_por:gestor.user_id||'',origem:'painel_gestor'});
+      return{ok:true,slot_id:finalSlotId,mensagem:'Slot criado com sucesso.'};
+    }
+
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function excluirSlot_(token, params) {
+  const gestor = _assertGestor_(token);
+  const { slot_id } = params;
+  if (!slot_id) throw new Error('slot_id obrigatório.');
 
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
 
-    const ss=SpreadsheetApp.openById(getConfig_('spreadsheet_id_master'));
-    const sheet=ss.getSheetByName('SLOTS'); if(!sheet) throw new Error('Aba SLOTS não encontrada.');
-    const slotId='SLT_'+new Date().getTime(), agora=new Date().toISOString();
-    const headers=sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
-    const row=new Array(headers.length).fill(''), h=headers.map(v=>String(v).toLowerCase().trim());
-    row[h.indexOf('slot_id')]=slotId; row[h.indexOf('cidade')]=cidade; row[h.indexOf('operacao')]='PROMO';
-    row[h.indexOf('local_nome')]=nome; row[h.indexOf('lat')]=parseFloat(lat); row[h.indexOf('lng')]=parseFloat(lng);
-    row[h.indexOf('raio_metros')]=parseInt(raio_metros)||100; row[h.indexOf('status')]='DISPONIVEL';
-    row[h.indexOf('cargo_previsto')]=cargo_previsto||'PROMOTOR'; row[h.indexOf('criado_em')]=agora; row[h.indexOf('atualizado_em')]=agora;
-    sheet.appendRow(row);
-    const lastRow=sheet.getLastRow();
-    const iData=h.indexOf('data'), iInicio=h.indexOf('inicio'), iFim=h.indexOf('fim');
-    if(iData>-1)   sheet.getRange(lastRow,iData+1).setNumberFormat('@').setValue(String(data).substring(0,10));
-    if(iInicio>-1) sheet.getRange(lastRow,iInicio+1).setNumberFormat('@').setValue(String(inicio).substring(0,5));
-    if(iFim>-1)    sheet.getRange(lastRow,iFim+1).setNumberFormat('@').setValue(String(fim).substring(0,5));
-    registrarAuditoria_({tabela:'SLOTS',registro_id:slotId,campo:'criacao',valor_anterior:'',valor_novo:JSON.stringify({nome,cidade,data,inicio,fim}),alterado_por:gestor.user_id||'',origem:'painel_gestor'});
-    return{ok:true,slot_id:slotId,mensagem:'Slot criado com sucesso.'};
+    const ss = SpreadsheetApp.openById(getConfig_('spreadsheet_id_master'));
+    const sheet = ss.getSheetByName('SLOTS');
+    if (!sheet) throw new Error('Aba SLOTS não encontrada.');
+
+    const data = sheet.getDataRange().getValues();
+    const h = data[0].map(v => String(v).toLowerCase().trim());
+    const iId = h.indexOf('slot_id'), iSt = h.indexOf('status'), iUpd = h.indexOf('atualizado_em');
+
+    for (let r = 1; r < data.length; r++) {
+      if (String(data[r][iId]).trim() === slot_id) {
+        sheet.getRange(r + 1, iSt + 1).setValue('CANCELADO');
+        sheet.getRange(r + 1, iUpd + 1).setValue(new Date().toISOString());
+        
+        registrarAuditoria_({tabela:'SLOTS',registro_id:slot_id,campo:'status',valor_anterior:String(data[r][iSt]),valor_novo:'CANCELADO',alterado_por:gestor.user_id||'',origem:'painel_gestor'});
+        return { ok: true, mensagem: 'Slot excluído com sucesso.' };
+      }
+    }
+    throw new Error('Slot não encontrado.');
 
   } finally {
     lock.releaseLock();
@@ -469,10 +597,133 @@ function getHistoricoLocalizacao_(token,params) {
     result.push({lat:rows[r][iLat]||null,lng:rows[r][iLng]||null,registrado_em:ts.toISOString(),trust_score:rows[r][iScore]||null});
   }
   result.sort((a,b)=>new Date(a.registrado_em)-new Date(b.registrado_em));
-  return{ok:true,data:result};
-}
+  return { ok: true, data: result };
+  }
 
-function getEscalaDrafts_(token) {
+  function getSlotsRange_(token, params) {
+    const adminUser = _assertGestor_(token);
+    const isFiscal = (adminUser.cargo_principal || '').toUpperCase() === 'FISCAL';
+    const myCity = normStr_(adminUser.cidade_base || adminUser.cidade || '');
+
+    const ss = SpreadsheetApp.openById(getConfig_('spreadsheet_id_master'));
+    const slotsWs = ss.getSheetByName('SLOTS');
+    if (!slotsWs) return { ok: true, data: [] };
+
+    const data = slotsWs.getDataRange().getValues();
+    const h = data[0].map(v => String(v).toLowerCase().trim());
+    const promMap = _getPromotoresMap_(ss);
+
+    const de = params.de || '';
+    const ate = params.ate || '';
+
+    const iSlotId = h.indexOf('slot_id'), iStatus = h.indexOf('status'), iUserId = h.indexOf('user_id');
+    const iNome = h.indexOf('local_nome'), iLat = h.indexOf('lat'), iLng = h.indexOf('lng'), iRaio = h.indexOf('raio_metros');
+    const iCidade = h.indexOf('cidade'), iInicio = h.indexOf('inicio'), iFim = h.indexOf('fim'), iData = h.indexOf('data');
+
+    const result = [];
+    const dailyStats = {}; // { '2026-04-01': { vagos: 0, ocupados: 0, encerrados: 0 } }
+
+    for (let r = 1; r < data.length; r++) {
+      const statusRaw = String(data[r][iStatus] || 'DISPONIVEL').trim().toUpperCase();
+      if (statusRaw === 'CANCELADO') continue;
+
+      const dataSlot = String(data[r][iData] || '').substring(0, 10);
+      if (de && dataSlot < de) continue;
+      if (ate && dataSlot > ate) continue;
+
+      const cidade = String(data[r][iCidade] || '');
+      if (isFiscal && normStr_(cidade) !== myCity) continue;
+
+      // Estatísticas para o Heatmap
+      if (!dailyStats[dataSlot]) dailyStats[dataSlot] = { vagos: 0, ocupados: 0, encerrados: 0 };
+      if (statusRaw === 'DISPONIVEL') dailyStats[dataSlot].vagos++;
+      else if (['ACEITO', 'EM_ATIVIDADE', 'PAUSADO', 'EM_TURNO'].includes(statusRaw)) dailyStats[dataSlot].ocupados++;
+      else if (statusRaw === 'ENCERRADO') dailyStats[dataSlot].encerrados++;
+
+      const userId = String(data[r][iUserId]).trim();
+      const prom = promMap[userId] || {};
+
+      result.push({
+        slot_id: String(data[r][iSlotId]).trim(),
+        nome: String(data[r][iNome] || '').trim(),
+        status: statusRaw,
+        user_id: userId,
+        promotor_nome: prom.nome || '',
+        data: dataSlot,
+        inicio: String(data[r][iInicio] || '').substring(0, 5),
+        fim: String(data[r][iFim] || '').substring(0, 5),
+        cidade: cidade,
+        lat: data[r][iLat] || null,
+        lng: data[r][iLng] || null,
+        raio_metros: data[r][iRaio] || 100
+      });
+    }
+
+    return { ok: true, data: result, stats: dailyStats };
+  }
+
+  function excluirSlotsLote_(token, params) {
+    const gestor = _assertGestor_(token);
+    const { ids } = params;
+    if (!Array.isArray(ids) || !ids.length) throw new Error('Lista de IDs inválida.');
+
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(15000);
+      const ss = SpreadsheetApp.openById(getConfig_('spreadsheet_id_master'));
+      const sheet = ss.getSheetByName('SLOTS');
+      const data = sheet.getDataRange().getValues();
+      const h = data[0].map(v => String(v).toLowerCase().trim());
+      const iId = h.indexOf('slot_id'), iSt = h.indexOf('status'), iUpd = h.indexOf('atualizado_em');
+
+      let count = 0;
+      const agora = new Date().toISOString();
+      const idsSet = new Set(ids);
+
+      for (let r = 1; r < data.length; r++) {
+        if (idsSet.has(String(data[r][iId]).trim())) {
+          sheet.getRange(r + 1, iSt + 1).setValue('CANCELADO');
+          sheet.getRange(r + 1, iUpd + 1).setValue(agora);
+          count++;
+        }
+      }
+      invalidarCache_();
+      return { ok: true, count, mensagem: count + ' slots excluídos com sucesso.' };
+    } finally {
+      lock.releaseLock();
+    }
+  }
+
+  function getLocaisFrequentes_(token) {
+    _assertGestor_(token);
+    const ss = SpreadsheetApp.openById(getConfig_('spreadsheet_id_master'));
+    const ws = ss.getSheetByName('LOCAIS_FREQUENTES');
+    if (!ws) return { ok: true, data: [] };
+    const data = ws.getDataRange().getValues();
+    const h = data[0].map(v => String(v).toLowerCase().trim());
+    const result = [];
+    for (let r = 1; r < data.length; r++) {
+      result.push(rowToObj_(h, data[r]));
+    }
+    return { ok: true, data: result };
+  }
+
+  function salvarLocalFrequente_(token, params) {
+    _assertGestor_(token);
+    const ss = SpreadsheetApp.openById(getConfig_('spreadsheet_id_master'));
+    let ws = ss.getSheetByName('LOCAIS_FREQUENTES');
+    if (!ws) {
+      ws = ss.insertSheet('LOCAIS_FREQUENTES');
+      ws.appendRow(['nome', 'cidade', 'lat', 'lng', 'raio_metros', 'cargo_previsto', 'operacao', 'criado_em']);
+    }
+    const agora = new Date().toISOString();
+    ws.appendRow([
+      params.nome, params.cidade, params.lat, params.lng, params.raio_metros || 100, 
+      params.cargo_previsto || 'PROMOTOR', params.operacao || 'PROMO', agora
+    ]);
+    return { ok: true, mensagem: 'Local salvo na biblioteca.' };
+  }
+  function getEscalaDrafts_(token) {
   const adminUser = _assertGestor_(token);
   const ss = SpreadsheetApp.openById(getConfig_('spreadsheet_id_master'));
   const sheet = ss.getSheetByName('ESCALAS_DRAFT');
@@ -681,7 +932,7 @@ function registrarIndicacao_(body) {
  */
 function replicarEscala_(token, params) {
   _assertGestor_(token);
-  const { data_origem, data_destino } = params;
+  const { data_origem, data_destino, ignorar_conflito } = params;
   if (!data_origem || !data_destino) throw new Error('Data origem e destino obrigatórias.');
 
   const ss = SpreadsheetApp.openById(getConfig_('spreadsheet_id_master'));
@@ -691,16 +942,29 @@ function replicarEscala_(token, params) {
   const data = ws.getDataRange().getValues();
   const h = data[0].map(v => String(v).toLowerCase().trim());
   
-  const iId = h.indexOf('slot_id'), iSt = h.indexOf('status'), iDt = h.indexOf('data');
+  const iId = h.indexOf('slot_id'), iSt = h.indexOf('status'), iDt = h.indexOf('data'), iNom = h.indexOf('local_nome'), iIni = h.indexOf('inicio'), iFim = h.indexOf('fim');
   const iUsr = h.indexOf('user_id'), iJrn = h.indexOf('jornada_id'), iAlerta = h.indexOf('tg_alerta_noshow');
   const iCri = h.indexOf('criado_em'), iUpd = h.indexOf('atualizado_em');
 
   const novosSlots = [];
   const agora = new Date().toISOString();
+  let conflitosCount = 0;
 
   for (let r = 1; r < data.length; r++) {
-    const dataSlot = String(data[r][iDt]).substring(0, 10);
+    const dataSlot = String(data[r][iDt] instanceof Date ? Utilities.formatDate(data[r][iDt], "GMT-3", "yyyy-MM-dd") : data[r][iDt]).substring(0, 10);
     if (dataSlot !== data_origem) continue;
+    if (String(data[r][iSt]).trim().toUpperCase() === 'CANCELADO') continue;
+
+    const nome = String(data[r][iNom]).trim();
+    const inicio = String(data[r][iIni]).substring(0, 5);
+    const fim = String(data[r][iFim]).substring(0, 5);
+
+    if (!ignorar_conflito) {
+      if (_validarConflitoSlot_(ss, nome, data_destino, inicio, fim)) {
+        conflitosCount++;
+        continue;
+      }
+    }
 
     // Clona a linha e limpa campos de vínculo/status
     const newRow = [...data[r]];
@@ -718,11 +982,13 @@ function replicarEscala_(token, params) {
 
   if (novosSlots.length > 0) {
     ws.getRange(ws.getLastRow() + 1, 1, novosSlots.length, novosSlots[0].length).setValues(novosSlots);
-    // Força sincronização do cache após criar em massa
     if (typeof sincronizarCacheSlots_ === 'function') sincronizarCacheSlots_();
   }
 
-  return { ok: true, count: novosSlots.length, mensagem: `${novosSlots.length} slots replicados para ${data_destino}.` };
+  let msg = `${novosSlots.length} slots replicados para ${data_destino}.`;
+  if (conflitosCount > 0) msg += ` (${conflitosCount} pulados por conflito).`;
+
+  return { ok: true, count: novosSlots.length, conflitos: conflitosCount, mensagem: msg };
 }
 
 /**

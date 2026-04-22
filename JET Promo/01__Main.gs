@@ -68,6 +68,8 @@ function doGet(e) {
       // ── Gestor ───────────────────────────────────────────────
       case 'GET_PROMOTORES_ATIVOS':         return jsonResp_(getPromotoresAtivos_(token));
       case 'GET_SLOTS_HOJE':                return jsonResp_(getSlotsHoje_(token, params));
+      case 'GET_SLOTS_RANGE':               return jsonResp_(getSlotsRange_(token, params));
+      case 'GET_LOCAIS_FREQUENTES':         return jsonResp_(getLocaisFrequentes_(token));
       case 'GET_SOLICITACOES_ABERTAS':      return jsonResp_(getSolicitacoesAbertas_(token));
       case 'GET_KPIS_DIA':                  return jsonResp_(getKpisDia_(token));
       case 'GET_RELATORIO_SUPERVISAO':      return jsonResp_(getRelatorioSupervisao_(token, params));
@@ -190,6 +192,9 @@ function doPost(e) {
 
       // ── Slots ────────────────────────────────────────────────
       case 'CRIAR_SLOT':                  return jsonResp_(criarSlot_(body.token, body));
+      case 'EXCLUIR_SLOT':                return jsonResp_(excluirSlot_(body.token, body));
+      case 'EXCLUIR_SLOTS_LOTE':          return jsonResp_(excluirSlotsLote_(body.token, body));
+      case 'SALVAR_LOCAL_FREQUENTE':      return jsonResp_(salvarLocalFrequente_(body.token, body));
 
       // ── CLT (próprio) ────────────────────────────────────────
       case 'GET_MEUS_TURNOS_CLT':               return jsonResp_(getMeusTurnosCLT_(user));
