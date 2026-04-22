@@ -200,7 +200,7 @@ const homeScreen = {
           <div class="header" style="background:#0A0A0A;border:none;height:80px;padding:0 24px">
             <div style="flex:1">
               <div style="font-size:12px;font-weight:800;color:#555;letter-spacing:1px">BEM-VINDO,</div>
-              <div style="font-size:22px;font-weight:900;color:#fff;font-family:'Syne'">${p.nome.split(' ')[0]}</div>
+              <div style="font-size:22px;font-weight:900;color:#fff;font-family:'Syne'">${(p.nome || p.nome_completo || 'Promotor').split(' ')[0]}</div>
             </div>
             <div id="hdr-score" style="font-size:14px;font-weight:900;color:#00FF87;background:rgba(0,255,135,.1);padding:8px 16px;border-radius:14px;font-family:var(--mono)">⭐ —</div>
           </div>
