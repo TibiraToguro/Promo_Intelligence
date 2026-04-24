@@ -24,10 +24,7 @@ const auth = {
   loginComTokenManual() {
     const el = document.getElementById('token-manual');
     const token = (el?.value || '').trim();
-    if (!token) {
-      ui.toast('Informe um token válido.', 'warning');
-      return;
-    }
+    if (!token) { ui.toast('Informe um token válido.', 'warning'); return; }
     state.saveToken(token);
     this.init();
   },
@@ -43,9 +40,9 @@ const auth = {
 
   renderAcesso(tipo, msg) {
     const cfg = {
-      negado: { icon: '🔒', color: 'var(--red)', btn: false },
+      negado:   { icon: '🔒', color: 'var(--red)',    btn: false },
       expirado: { icon: '⏰', color: 'var(--yellow)', btn: false },
-      erro: { icon: '📡', color: 'var(--gray)', btn: true }
+      erro:     { icon: '📡', color: 'var(--gray)',   btn: true  }
     };
     const { icon, color, btn } = cfg[tipo] || cfg.negado;
 
@@ -70,11 +67,36 @@ const auth = {
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// homeScreen
+// ─────────────────────────────────────────────────────────────────────────────
 const homeScreen = {
   render() {
     const p = state.get('promotor');
-    const slot = state.get('slot');
     if (!p) return router.go('splash');
+
+    // ── CORREÇÃO: sempre busca slot atualizado do servidor ──────────────────
+    this._renderComDados(p, state.get('slot'));
+    this._atualizarSlot();
+  },
+
+  async _atualizarSlot() {
+    try {
+      const res = await api.get('GET_SLOT_ATUAL');
+      if (res.ok && res.dados) {
+        state.set('slot', res.dados);
+        // Re-renderiza silenciosamente se o status mudou
+        const p = state.get('promotor');
+        if (p) this._renderComDados(p, res.dados);
+      } else if (res.ok && !res.dados) {
+        state.set('slot', null);
+        const p = state.get('promotor');
+        if (p) this._renderComDados(p, null);
+      }
+    } catch (_) {}
+  },
+
+  _renderComDados(p, slot) {
     const statusAtual = slot?.status || 'SEM_SLOT';
 
     ui.render(`
@@ -111,17 +133,38 @@ const homeScreen = {
   },
 
   _slotCard(slot) {
-    return `<div class="slot-card" onclick="router.go('slot')" style="cursor:pointer"><div class="slot-card-top"><div class="slot-local">📍 ${slot.local || '—'}</div>${ui.statusBadge(slot.status)}</div><div class="slot-horario">🕐 ${ui.hora(slot.inicio)} – ${ui.hora(slot.fim)}</div></div>`;
+    return `
+      <div class="slot-card" onclick="router.go('slot')" style="cursor:pointer">
+        <div class="slot-card-top">
+          <div class="slot-local">📍 ${slot.local || '—'}</div>
+          ${ui.statusBadge(slot.status)}
+        </div>
+        <div class="slot-horario">🕐 ${ui.hora(slot.inicio)} – ${ui.hora(slot.fim)}</div>
+      </div>`;
   },
 
   _semSlot() {
-    return `<div class="card" style="text-align:center">Nenhum slot ativo no momento</div>`;
+    return `<div class="card" style="text-align:center;color:var(--text2)">Nenhum slot ativo no momento</div>`;
   },
 
   _acoes(status) {
-    if (status === 'ACEITO') return `<button class="btn btn-success" onclick="router.go('checkin')">✅ CHECK-IN</button>`;
-    if (status === 'EM_ATIVIDADE') return `<div style="display:flex;flex-direction:column;gap:10px"><button class="btn btn-warning" onclick="router.go('pausa')">⏸️ Pausar</button><button class="btn btn-ghost" onclick="router.go('checkout')">🏁 Check-out</button></div>`;
-    if (status === 'PAUSADO') return `<div style="display:flex;flex-direction:column;gap:10px"><button class="btn btn-success" onclick="router.go('resume')">▶️ Retomar</button><button class="btn btn-ghost" onclick="router.go('checkout')">🏁 Check-out</button></div>`;
+    if (status === 'ACEITO') {
+      return `<button class="btn btn-success" onclick="router.go('checkin')">✅ CHECK-IN</button>`;
+    }
+    if (status === 'EM_ATIVIDADE') {
+      return `
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn-warning" onclick="router.go('pausa')">⏸️ Pausar</button>
+          <button class="btn btn-ghost"   onclick="router.go('checkout')">🏁 Check-out</button>
+        </div>`;
+    }
+    if (status === 'PAUSADO') {
+      return `
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn-success" onclick="router.go('resume')">▶️ Retomar</button>
+          <button class="btn btn-ghost"   onclick="router.go('checkout')">🏁 Check-out</button>
+        </div>`;
+    }
     return '';
   }
 };
